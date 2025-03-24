@@ -1,0 +1,134 @@
+version: '3.8'
+
+volumes:
+    qbittorrent_config:
+    overseerr_config:
+    prowlarr_config:
+    radarr_config:
+    sonarr_config:
+    lidarr_config:
+    plex_config:
+    gluetun_config:
+    
+services:
+  gluetun:
+    container_name: gluetun
+    image: qmcgaw/gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8080:8080 # qbitt web interface
+      - 6881:6881 # qbitt torrent
+      - 9696:9696 # prowlarr
+    volumes:
+      - gluetun_config:/config  
+    environment:
+        - VPN_SERVICE_PROVIDER=nordvpn
+        - VPN_TYPE=wireguard # or openvpn
+        - WIREGUARD_PRIVATE_KEY=
+        - SERVER_COUNTRIES=United States
+    healthcheck:
+      test: ping -c 1 www.google.com || exit 1
+      interval: 60s
+      timeout: 20s
+      retries: 5
+    restart: unless-stopped  
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - WEBUI_PORT=8080
+    volumes:
+      - qbittorrent_config:/config
+      - /home/atom/Projects/arr/data/torrents:/data/torrents
+    network_mode: service:gluetun
+    restart: unless-stopped
+  
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=PUID:-1000
+      - PGID=PGID:-1000
+      - TZ=Etc/CTC
+    volumes:
+      - prowlarr_config:/config/
+    restart: unless-stopped
+    network_mode: service:gluetun
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - radarr_config:/config
+      - /home/atom/Projects/arr/data:/data
+    restart: unless-stopped
+    ports:
+      - 7878:7878 
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - sonarr_config:/config
+      - /home/atom/Projects/arr/data:/data
+    restart: unless-stopped
+    ports:
+      - 8989:8989
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - overseerr_config:/config
+    restart: unless-stopped
+    ports:
+     - 5055:5055 
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /lidarr_config:/config
+      - /home/atom/Projects/arr/data:/data
+    restart: unless-stopped 
+    ports:
+      - 8686:8686
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    environment:
+      - PUID=1024
+      - PGID=100
+      - TZ=Etc/UTC
+      - VERSION=docker
+      - PLEX_CLAIM=
+    volumes:
+      - plex_config:/config
+      - /home/atom/Projects/arr/data/media:/data/media
+    restart: unless-stopped
+    ports:
+    - 32400:32400 #web media server
+    - 1900:1900/udp #dlna server
+    - 32410:32410/udp # gdm network discovery
+
